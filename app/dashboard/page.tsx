@@ -300,7 +300,10 @@ function DashContent() {
             </label>
             {isGuest
               ? <button onClick={()=>router.push('/register')} style={{ background:'#0f172a', border:'none', color:'#fff', padding:'7px 16px', borderRadius:20, fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:'inherit' }}>Save data →</button>
-              : <button onClick={()=>{ localStorage.clear(); router.push('/'); }} style={{ background:'none', border:'1px solid #d2d2d7', color:'#1d1d1f', padding:'6px 14px', borderRadius:20, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Sign out</button>
+              : <div style={{display:'flex', gap:8}}>
+    <button onClick={()=>router.push('/profile')} style={{ background:'none', border:'1px solid #d2d2d7', color:'#1d1d1f', padding:'6px 14px', borderRadius:20, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>⚙️ Profile</button>
+    <button onClick={()=>{ localStorage.clear(); router.push('/'); }} style={{ background:'none', border:'1px solid #d2d2d7', color:'#1d1d1f', padding:'6px 14px', borderRadius:20, fontSize:13, cursor:'pointer', fontFamily:'inherit' }}>Sign out</button>
+  </div>
             }
           </div>
         </div>

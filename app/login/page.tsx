@@ -195,7 +195,7 @@ export default function LoginPage() {
                 fontWeight: 500,
                 whiteSpace: 'nowrap',
               }}>
-                I forgot my password
+                
               </span>
             </div>
 
