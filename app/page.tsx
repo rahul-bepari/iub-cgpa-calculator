@@ -74,7 +74,7 @@ export default function Home() {
               <div style={{ fontSize: 13, fontWeight: 700, color: '#1d1d1f', lineHeight: 1.2 }}>Bangladesh</div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 4 }}>
                 <div style={{ width: 6, height: 6, background: '#34c759', borderRadius: '50%' }} />
-                <span style={{ fontSize: 11, color: '#6e6e73' }}>Official CGPA Tool</span>
+                <span style={{ fontSize: 11, color: '#6e6e73' }}>CGPA Tool</span>
               </div>
             </div>
           </div>
