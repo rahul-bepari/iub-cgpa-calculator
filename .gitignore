@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Environment variables - NEVER upload these
+.env.local
+.env
+.env*.local
+
+# Dependencies
+node_modules/
+.next/
+.turbo/
+
+# Setup file - not needed on server
+setup-db.js
