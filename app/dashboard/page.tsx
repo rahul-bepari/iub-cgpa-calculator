@@ -24,11 +24,44 @@ function gradeChip(g: string) {
 }
 
 function calcCGPA(cs: any[]) {
-  const v = cs.filter(c => Number(c.credit_earned) > 0);
-  const earned = v.reduce((s:number,c:any) => s + Number(c.credit_earned), 0);
-  const pts = v.reduce((s:number,c:any) => s + Number(c.grade_point), 0);
-  const attempted = cs.reduce((s:number,c:any) => s + Number(c.credit), 0);
-  return { cgpa: earned>0 ? Math.round(pts/earned*100)/100 : 0, earned, pts, attempted };
+  // IUB Rule: If a course has been retaken, only count the LATEST grade
+  // Group by base course code, keep only the best/latest entry
+  const courseMap = new Map<string, any>();
+  
+  cs.forEach(c => {
+    if (Number(c.credit_earned) <= 0) return; // skip failed/withdrawn
+    
+    const key = c.course_code; // keep theory and lab separate
+    const existing = courseMap.get(key);
+    
+    if (!existing) {
+      courseMap.set(key, c);
+    } else {
+      // If this is a retake, use the retake grade (course_type === 'retake')
+      // Otherwise keep whichever has higher grade points
+      if (c.course_type === 'retake') {
+        courseMap.set(key, c);
+      } else if (existing.course_type !== 'retake') {
+        // Neither is marked retake, keep the one with more grade points
+        // (shouldn't happen but safety net)
+        if (Number(c.grade_point) > Number(existing.grade_point)) {
+          courseMap.set(key, c);
+        }
+      }
+    }
+  });
+
+  const validCourses = Array.from(courseMap.values());
+  const earned = validCourses.reduce((s, c) => s + Number(c.credit_earned), 0);
+  const pts = validCourses.reduce((s, c) => s + Number(c.grade_point), 0);
+  const attempted = cs.reduce((s: number, c: any) => s + Number(c.credit), 0);
+  
+  return { 
+    cgpa: earned > 0 ? Math.round(pts / earned * 100) / 100 : 0, 
+    earned, 
+    pts, 
+    attempted 
+  };
 }
 
 function getPair(cs: any[], base: string) {
@@ -224,6 +257,21 @@ function DashContent() {
     const count = (theory?1:0)+(lab?1:0);
     setRetakeOpen(false);
     toast$(`✓ Updated ${count} course${count>1?'s':''} (${theory?'theory':''}${lab?' + lab':''})`);
+  };
+  const deleteCourse = async (courseCode: string) => {
+    if (!confirm(`Remove ${courseCode} from your course list?`)) return;
+    
+    if (!isGuest) {
+      const token = localStorage.getItem('token');
+      await fetch('/api/courses', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ course_code: courseCode }),
+      });
+    }
+    
+    setCourses(p => p.filter(x => x.course_code !== courseCode));
+    toast$(`✓ ${courseCode} removed`);
   };
 
   if (loading) return (
@@ -428,7 +476,7 @@ function DashContent() {
                 <div style={{ background:'#fff', borderRadius:14, overflow:'hidden', border:'1px solid #e5e5ea', boxShadow:'0 1px 4px rgba(0,0,0,0.04)' }}>
                   {/* Header */}
                   <div style={{ display:'grid', gridTemplateColumns:'130px 1fr 72px 64px 100px', padding:'10px 18px', background:'#f5f5f7', borderBottom:'1px solid #e5e5ea' }}>
-                    {['Code','Title','Grade','Credit','Semester'].map((h,i)=>(
+                    {['Code','Title','Grade','Credit','Semester',''].map((h,i)=>(
                       <div key={h} style={{ fontSize:11, fontWeight:700, color:'#6e6e73', textTransform:'uppercase', letterSpacing:0.5, textAlign:i>1?'center':'left' }}>{h}</div>
                     ))}
                   </div>
@@ -439,20 +487,26 @@ function DashContent() {
                     const {bg,color}=gradeChip(c.grade);
                     const isLab = c.course_code.endsWith('L');
                     return (
-                      <div key={i} style={{ display:'grid', gridTemplateColumns:'130px 1fr 72px 64px 100px', padding:'11px 18px', borderBottom:i<filtered.length-1?'1px solid #f5f5f7':'none', alignItems:'center', background:isLab?'#fafafa':'#fff' }}>
-                        <div style={{ display:'flex', alignItems:'center', gap:5 }}>
-                          {isLab && <span style={{ fontSize:10 }}>🧪</span>}
-                          <span style={{ fontWeight:700, fontSize:13, color:'#0f172a' }}>{c.course_code}</span>
-                          {c.course_type==='retake' && <span style={{ background:'#dcfce7', color:'#15803d', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4 }}>R</span>}
-                          {c.course_type==='new' && <span style={{ background:'#dbeafe', color:'#1e40af', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4 }}>N</span>}
-                        </div>
-                        <div style={{ fontSize:13, color:'#374151' }}>{c.course_title}</div>
-                        <div style={{ textAlign:'center' }}>
-                          <span style={{ background:bg, color, fontWeight:700, fontSize:12, padding:'2px 8px', borderRadius:5 }}>{c.grade}</span>
-                        </div>
-                        <div style={{ textAlign:'center', fontSize:13, color:'#6e6e73' }}>{c.credit}</div>
-                        <div style={{ textAlign:'center', fontSize:11, color:'#aeaeb2' }}>{c.semester?.split(' ').slice(0,2).join(' ')}</div>
-                      </div>
+                      <div key={i} style={{ display:'grid', gridTemplateColumns:'130px 1fr 72px 64px 80px 40px', padding:'11px 18px', borderBottom:i<filtered.length-1?'1px solid #f5f5f7':'none', alignItems:'center', background:isLab?'#fafafa':'#fff' }}>
+  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+    {isLab && <span style={{ fontSize:10 }}>🧪</span>}
+    <span style={{ fontWeight:700, fontSize:13, color:'#0f172a' }}>{c.course_code}</span>
+    {c.course_type==='retake' && <span style={{ background:'#dcfce7', color:'#15803d', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4 }}>R</span>}
+    {c.course_type==='new' && <span style={{ background:'#dbeafe', color:'#1e40af', fontSize:9, fontWeight:700, padding:'1px 5px', borderRadius:4 }}>N</span>}
+  </div>
+  <div style={{ fontSize:13, color:'#374151' }}>{c.course_title}</div>
+  <div style={{ textAlign:'center' }}>
+    <span style={{ background:bg, color, fontWeight:700, fontSize:12, padding:'2px 8px', borderRadius:5 }}>{c.grade}</span>
+  </div>
+  <div style={{ textAlign:'center', fontSize:13, color:'#6e6e73' }}>{c.credit}</div>
+  <div style={{ textAlign:'center', fontSize:11, color:'#aeaeb2' }}>{c.semester?.split(' ').slice(0,2).join(' ')}</div>
+  <button
+    onClick={() => deleteCourse(c.course_code)}
+    style={{ background:'none', border:'none', cursor:'pointer', fontSize:16, color:'#aeaeb2', padding:'4px', borderRadius:6, display:'flex', alignItems:'center', justifyContent:'center', fontFamily:'inherit' }}
+    title="Remove course">
+    ❌
+  </button>
+</div>
                     );
                   })}
                 </div>

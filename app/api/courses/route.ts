@@ -106,3 +106,17 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({ success: true, message: 'Grade updated!' });
 }
+// DELETE - remove a course
+export async function DELETE(req: NextRequest) {
+  const userId = getUserId(req);
+  if (!userId) return NextResponse.json({ success: false, error: 'Unauthorized' });
+
+  const { course_code } = await req.json();
+  
+  await pool.query(
+    'DELETE FROM courses WHERE user_id = $1 AND course_code = $2',
+    [userId, course_code]
+  );
+
+  return NextResponse.json({ success: true, message: 'Course removed!' });
+}
