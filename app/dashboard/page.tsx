@@ -24,43 +24,63 @@ function gradeChip(g: string) {
 }
 
 function calcCGPA(cs: any[]) {
-  // IUB Rule: If a course has been retaken, only count the LATEST grade
-  // Group by base course code, keep only the best/latest entry
-  const courseMap = new Map<string, any>();
-  
+  // IUB Rules:
+  // W (Withdraw) → completely ignored, not counted at all
+  // F (Fail) → counts as 0 grade points, credit attempted counted
+  // Retake (R) → completely replaces the original entry
+  // T (Transfer attempt fail) → ignored
+
+  // Step 1: Group by course_code
+  const grouped = new Map<string, any[]>();
   cs.forEach(c => {
-    if (Number(c.credit_earned) <= 0) return; // skip failed/withdrawn
-    
-    const key = c.course_code; // keep theory and lab separate
-    const existing = courseMap.get(key);
-    
-    if (!existing) {
-      courseMap.set(key, c);
-    } else {
-      // If this is a retake, use the retake grade (course_type === 'retake')
-      // Otherwise keep whichever has higher grade points
-      if (c.course_type === 'retake') {
-        courseMap.set(key, c);
-      } else if (existing.course_type !== 'retake') {
-        // Neither is marked retake, keep the one with more grade points
-        // (shouldn't happen but safety net)
-        if (Number(c.grade_point) > Number(existing.grade_point)) {
-          courseMap.set(key, c);
-        }
+    const key = c.course_code;
+    const existing = grouped.get(key) || [];
+    existing.push(c);
+    grouped.set(key, existing);
+  });
+
+  let totalCreditEarned = 0;
+  let totalGradePoints = 0;
+  let totalAttempted = 0;
+
+  grouped.forEach((entries) => {
+    const retake = entries.find(e => e.course_type === 'retake');
+    const transfer = entries.find(e => e.course_type === 'transfer');
+    const regular = entries.find(e => e.course_type === 'regular' || e.course_type === 'new');
+
+    if (retake) {
+      // Retake exists — use ONLY retake, completely discard original
+      // W entries for this course are ignored
+      if (retake.grade === 'W') return; // withdrawn retake, skip
+      totalCreditEarned += Number(retake.credit_earned);
+      totalGradePoints += Number(retake.grade_point);
+      totalAttempted += Number(retake.credit);
+    } else if (regular) {
+      // No retake — check grade
+      if (regular.grade === 'W') return; // W = completely ignore
+      if (regular.grade === 'F') {
+        // F = counts in attempted, 0 earned, 0 grade points
+        totalAttempted += Number(regular.credit);
+        // credit_earned stays 0, grade_point stays 0
+        return;
       }
+      // Normal grade
+      totalCreditEarned += Number(regular.credit_earned);
+      totalGradePoints += Number(regular.grade_point);
+      totalAttempted += Number(regular.credit);
+    } else if (transfer) {
+      // Transfer/T type — ignore completely
+      return;
     }
   });
 
-  const validCourses = Array.from(courseMap.values());
-  const earned = validCourses.reduce((s, c) => s + Number(c.credit_earned), 0);
-  const pts = validCourses.reduce((s, c) => s + Number(c.grade_point), 0);
-  const attempted = cs.reduce((s: number, c: any) => s + Number(c.credit), 0);
-  
-  return { 
-    cgpa: earned > 0 ? Math.round(pts / earned * 100) / 100 : 0, 
-    earned, 
-    pts, 
-    attempted 
+  return {
+    cgpa: totalCreditEarned > 0
+      ? Math.round(totalGradePoints / totalCreditEarned * 100) / 100
+      : 0,
+    earned: totalCreditEarned,
+    pts: Math.round(totalGradePoints * 100) / 100,
+    attempted: totalAttempted,
   };
 }
 
@@ -76,7 +96,7 @@ function getRecs(cs: any[]) {
   const seen = new Set<string>();
   const recs: any[] = [];
 
-  cs.filter(c => Number(c.credit_earned)>0 && LOW_GRADES.includes(c.grade))
+  cs.filter(c => (Number(c.credit_earned)>0 || c.grade==='F') && LOW_GRADES.includes(c.grade) && c.course_type!=='transfer')
     .forEach(c => {
       const base = baseCode(c.course_code);
       if (seen.has(base)) return;

@@ -32,30 +32,30 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
 
   // Bulk save from transcript
-  if (body.courses && Array.isArray(body.courses)) {
-    await pool.query('DELETE FROM courses WHERE user_id = $1', [userId]);
-    for (const c of body.courses) {
-      await pool.query(
-        `INSERT INTO courses
-          (user_id, course_code, course_title, grade, credit, credit_earned, grade_point, semester, course_type)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-        [userId, c.course_code, c.course_title, c.grade, c.credit,
-         c.credit_earned, c.grade_point, c.semester, c.course_type || 'regular']
-      );
-    }
-
-    // Save transcript summary
-    if (body.summary) {
-      await pool.query(
-        `INSERT INTO transcripts (user_id, total_credits_attempted, total_credits_earned, total_grade_points, cgpa)
-         VALUES ($1,$2,$3,$4,$5)
-         ON CONFLICT DO NOTHING`,
-        [userId, body.summary.total_credits_attempted, body.summary.total_credits_earned,
-         body.summary.total_grade_points, body.summary.cgpa]
-      );
-    }
-    return NextResponse.json({ success: true, message: 'Transcript saved!' });
+if (body.courses && Array.isArray(body.courses)) {
+  await pool.query('DELETE FROM courses WHERE user_id = $1', [userId]);
+  
+  for (const c of body.courses) {
+    await pool.query(
+      `INSERT INTO courses
+        (user_id, course_code, course_title, grade, credit, credit_earned, grade_point, semester, course_type)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [userId, c.course_code, c.course_title, c.grade, c.credit,
+       c.credit_earned, c.grade_point, c.semester, c.course_type || 'regular']
+    );
   }
+
+  if (body.summary) {
+    await pool.query(`DELETE FROM transcripts WHERE user_id = $1`, [userId]);
+    await pool.query(
+      `INSERT INTO transcripts (user_id, total_credits_attempted, total_credits_earned, total_grade_points, cgpa)
+       VALUES ($1,$2,$3,$4,$5)`,
+      [userId, body.summary.total_credits_attempted, body.summary.total_credits_earned,
+       body.summary.total_grade_points, body.summary.cgpa]
+    );
+  }
+  return NextResponse.json({ success: true, message: 'Transcript saved!' });
+}
 
   // Add single new course
   const { course_code, course_title, grade, credit, semester } = body;
